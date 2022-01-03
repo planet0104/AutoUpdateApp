@@ -1,0 +1,134 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    compileSdk 31
+    project.archivesBaseName = "AutoUpdateApp"
+    defaultConfig {
+        applicationId "run.ccfish.android.autoupdateapp"
+        minSdk 16
+        targetSdk 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+task autoSign {
+    //依赖于其他Task执行完，在执行本Task
+    // 这个task执行会在assembleDebug之后执行
+    dependsOn 'assembleDebug'
+    //先执行
+    doFirst{
+
+    }
+    // 后执行
+    doLast{
+        //签名文件目录
+        def signDir = project.rootDir.absolutePath +"/rk3399-android-8.1/"
+        //签名包的输出目录
+        def outputDir = signDir + "out/"
+
+        android.applicationVariants.all { variant ->
+            variant.outputs.all { output ->
+                //获取 apk打包出来的文件 output.outputFile
+                def exist = output.outputFile.exists()
+                if (exist) {
+                    //签名之后的apk名字
+                    def name = "signed_" + output.outputFile.getName()
+                    //apk打包所在的目录
+                    def apk = output.outputFile.getPath()
+                    //根据不同渠道获取对于的.sh文件路径
+                    def shPath = signDir + "sign.sh"
+                    println("-----------------------------------")
+                    def wslShPath = shPath.replace('\\', "/").replace('C:', '/mnt/c')
+                    def bashSignDir = signDir.replace('\\', "/").replace('C:', '/mnt/c')
+                    def wslApk = apk.replace('\\', "/").replace('C:', '/mnt/c')
+                    def wslOutputDir = outputDir.replace('\\', "/").replace('C:', '/mnt/c')
+                    def outApk = outputDir + name;
+                    println("签名文件脚本：" + shPath)
+                    println("签名路径: "+signDir)
+                    exec {
+                        //切换到sh文件所在的目录，执行脚本
+                        workingDir signDir
+                        //执行shell脚本 "," 传参
+                        commandLine "bash", wslShPath, wslApk, wslOutputDir + name
+                    }
+                    println("签名成功，文件保存至：" + outApk)
+                    println("-----------------------------------")
+                }
+            }
+        }
+    }
+}
+
+task autoSignAndInstall {
+    //依赖于其他Task执行完，在执行本Task
+    // 这个task执行会在assembleDebug之后执行
+    dependsOn 'autoSign'
+    //先执行
+    doFirst{
+
+    }
+    // 后执行
+    doLast{
+        //签名文件目录
+        def signDir = project.rootDir.absolutePath +"/rk3399-android-8.1/"
+        //签名包的输出目录
+        def outputDir = signDir + "out/"
+
+        android.applicationVariants.all { variant ->
+            variant.outputs.all { output ->
+                //获取 apk打包出来的文件 output.outputFile
+                def exist = output.outputFile.exists()
+                if (exist) {
+                    //签名之后的apk名字
+                    def name = "signed_" + output.outputFile.getName()
+                    def outApk = outputDir + name;
+                    // adb安装apk
+                    println("开始安装apk:"+outApk)
+                    exec {
+                        //切换到sh文件所在的目录，执行脚本
+                        workingDir signDir
+                        //-r 覆盖安装
+                        commandLine "adb","install", "-r", outApk
+                    }
+                    println("启动app...")
+                    exec {
+                        //切换到sh文件所在的目录，执行脚本
+                        workingDir signDir
+                        //执行shell脚本 "," 传参
+                        //adb shell am start com.android.settings/.HWSettings
+                        commandLine "adb","shell", "am", "start", "run.ccfish.android.autoupdateapp/.MainActivity"
+                    }
+                    println("-----------------------------------")
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.google.android.material:material:1.3.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+
+    implementation 'com.luffykou:android-common-utils:1.1.3'
+}
