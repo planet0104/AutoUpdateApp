@@ -27,47 +27,86 @@ android {
     }
 }
 
-task autoSign {
-    //依赖于其他Task执行完，在执行本Task
-    // 这个task执行会在assembleDebug之后执行
-    dependsOn 'assembleDebug'
-    //先执行
-    doFirst{
+ext {
+    // ext 没有放到项目根目录，当前目录为子目录
+    //用来设置当前编译的系统签名路径，不同设备签名不一样
+//    signDir = rootProject.rootDir.absolutePath+ '/rk3399-android-8.1/'
+    signDir = rootProject.rootDir.absolutePath+ '/emulator-android-8.1/'
+}
 
+/**
+ * 如果是windows系统，需要在wsl中进行签名，将路径替换为wsl linux路径
+ * @param path
+ */
+def replaceWslPath(path){
+    if(System.properties['os.name'].contains('windows')
+        || System.properties['os.name'].contains('Windows')
+    ){
+        return path.replace('\\', "/").replace('C:', '/mnt/c').replace('D:', '/mnt/d')
+    }else{
+        return path;
     }
-    // 后执行
-    doLast{
-        //签名文件目录
-        def signDir = project.rootDir.absolutePath +"/rk3399-android-8.1/"
-        //签名包的输出目录
-        def outputDir = signDir + "out/"
+}
 
-        android.applicationVariants.all { variant ->
-            variant.outputs.all { output ->
-                //获取 apk打包出来的文件 output.outputFile
-                def exist = output.outputFile.exists()
-                if (exist) {
-                    //签名之后的apk名字
-                    def name = "signed_" + output.outputFile.getName()
+/**
+ * 签名生成的apk
+ * @param signDir 签名目录，输出的签名后的apk也放在此目录
+ * @param install [Boolean] 是否执行adb安装
+ * @return
+ */
+def signApk(signDir, adbInstall, isRelease){
+    println('调用signApk signDir='+signDir+' adbInstall='+adbInstall)
+    android.applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            //获取 apk打包出来的文件 output.outputFile
+            def exist = output.outputFile.exists()
+            if (exist) {
+                //签名之后的apk名字
+                def signedApkName = output.outputFile.getName().replace(".apk", "-signed.apk")
+                signedApkName = signedApkName.replace("-unsigned", "");
+                if(signedApkName.contains('release') && isRelease
+                    ||
+                    signedApkName.contains('debug') && !isRelease
+                ){
+                    def signedApkPathName = signDir + signedApkName;
                     //apk打包所在的目录
-                    def apk = output.outputFile.getPath()
+                    def srcApkPath = output.outputFile.getPath()
                     //根据不同渠道获取对于的.sh文件路径
                     def shPath = signDir + "sign.sh"
                     println("-----------------------------------")
-                    def wslShPath = shPath.replace('\\', "/").replace('C:', '/mnt/c')
-                    def bashSignDir = signDir.replace('\\', "/").replace('C:', '/mnt/c')
-                    def wslApk = apk.replace('\\', "/").replace('C:', '/mnt/c')
-                    def wslOutputDir = outputDir.replace('\\', "/").replace('C:', '/mnt/c')
-                    def outApk = outputDir + name;
-                    println("签名文件脚本：" + shPath)
-                    println("签名路径: "+signDir)
+                    println("签名文件脚本：" + replaceWslPath(shPath))
+                    println("签名路径: "+replaceWslPath(signDir))
+                    println("原始apk路径："+replaceWslPath(srcApkPath))
+                    println("签名的apk路径："+replaceWslPath(signedApkPathName))
+                    def cmdName = "sh"
+                    if(System.properties['os.name'].contains('windows')|| System.properties['os.name'].contains('Windows')){
+                        cmdName = "bash"
+                    }
                     exec {
                         //切换到sh文件所在的目录，执行脚本
                         workingDir signDir
                         //执行shell脚本 "," 传参
-                        commandLine "bash", wslShPath, wslApk, wslOutputDir + name
+                        commandLine cmdName, replaceWslPath(shPath), replaceWslPath(srcApkPath), replaceWslPath(signedApkPathName)
                     }
-                    println("签名成功，文件保存至：" + outApk)
+                    println("签名成功，文件保存至：" + signedApkPathName)
+                    if(adbInstall){
+                        // adb安装apk
+                        println("开始安装apk:"+signedApkPathName)
+                        exec {
+                            //切换到sh文件所在的目录，执行脚本
+                            workingDir signDir
+                            //-r 覆盖安装
+                            commandLine "adb","install", "-r", signedApkPathName
+                        }
+                        println("启动app...")
+                        exec {
+                            //切换到sh文件所在的目录，执行脚本
+                            workingDir signDir
+                            //启动App
+                            commandLine "adb","shell", "am", "start", variant.applicationId+"/.MainActivity"
+                        }
+                        println("-----------------------------------")
+                    }
                     println("-----------------------------------")
                 }
             }
@@ -75,49 +114,39 @@ task autoSign {
     }
 }
 
-task autoSignAndInstall {
-    //依赖于其他Task执行完，在执行本Task
+task autoSignDebug {
     // 这个task执行会在assembleDebug之后执行
-    dependsOn 'autoSign'
-    //先执行
-    doFirst{
-
-    }
-    // 后执行
+    dependsOn 'assembleDebug'
+    doFirst{}
     doLast{
-        //签名文件目录
-        def signDir = project.rootDir.absolutePath +"/rk3399-android-8.1/"
-        //签名包的输出目录
-        def outputDir = signDir + "out/"
+        signApk(project.ext.signDir, false, false)
+    }
+}
 
-        android.applicationVariants.all { variant ->
-            variant.outputs.all { output ->
-                //获取 apk打包出来的文件 output.outputFile
-                def exist = output.outputFile.exists()
-                if (exist) {
-                    //签名之后的apk名字
-                    def name = "signed_" + output.outputFile.getName()
-                    def outApk = outputDir + name;
-                    // adb安装apk
-                    println("开始安装apk:"+outApk)
-                    exec {
-                        //切换到sh文件所在的目录，执行脚本
-                        workingDir signDir
-                        //-r 覆盖安装
-                        commandLine "adb","install", "-r", outApk
-                    }
-                    println("启动app...")
-                    exec {
-                        //切换到sh文件所在的目录，执行脚本
-                        workingDir signDir
-                        //执行shell脚本 "," 传参
-                        //adb shell am start com.android.settings/.HWSettings
-                        commandLine "adb","shell", "am", "start", "run.ccfish.android.autoupdateapp/.MainActivity"
-                    }
-                    println("-----------------------------------")
-                }
-            }
-        }
+task autoSignDebugRun {
+    // 这个task执行会在assembleDebug之后执行
+    dependsOn 'assembleDebug'
+    doFirst{}
+    doLast{
+        signApk(project.ext.signDir, true, false)
+    }
+}
+
+task autoSignRelease {
+    // 这个task执行会在assembleDebug之后执行
+    dependsOn 'assembleRelease'
+    doFirst{}
+    doLast{
+        signApk(project.ext.signDir, false, true)
+    }
+}
+
+task autoSignReleaseRun {
+    // 这个task执行会在assembleDebug之后执行
+    dependsOn 'assembleRelease'
+    doFirst{}
+    doLast{
+        signApk(project.ext.signDir, true, true)
     }
 }
 
