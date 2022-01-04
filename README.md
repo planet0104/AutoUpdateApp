@@ -23,10 +23,9 @@ http://androidxref.com/8.1.0_r33/xref/build/target/product/security/
 在这里找到lib64：http://androidxref.com/8.1.0_r33/xref/prebuilts/sdk/tools/linux/lib64/
 
 ## 打包好的apk进行系统签名
-> autoSign任务参考: https://blog.csdn.net/a_zhon/article/details/85065047
 
-在windows系统中，安装wsl
-在gradle-> Tasks -> other中执行 autoSign任务，签名成功后在rk3399-android-8.1目录下生成前面后的apk
+在windows系统中，需要安装安装wsl才能进行编译
+
 ```shell
 # 系统中需要java8版本，如果没有请安装
 sudo apt-get install openjdk-8-jre-headless
