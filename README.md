@@ -1,5 +1,55 @@
 # AutoUpdateApp (rk3399-android-8.1)
 
+# 自动升级流程
+
+## 1.下载apk安装包
+
+## 2.调用shell pm install安装apk
+
+```java
+String cmd_install = "pm install -r -i "+context.getPackageName()+" "+apk.getAbsolutePath();
+ShellUtil.CommandResult result = ShellUtil.execCommand(cmd_install, false);
+```
+
+## 监听apk安装完成广播，重新启动程序
+
+```java
+public class PackageReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent.getAction().equals(Intent.ACTION_MY_PACKAGE_REPLACED)) {
+            Toast.makeText(context, "升级成功", Toast.LENGTH_LONG).show();
+            //升级成功后启动app
+            Intent appIntent = new Intent(context, MainActivity.class);
+            context.startActivity(appIntent);
+        }
+    }
+}
+```
+
+# 配置System UID权限 和 apk安装完成广播
+
+## 修改 app/src/main/AndroidManifest.xml
+
+1. 添加Sytem UID权限
+```xml
+<manifest android:sharedUserId="android.uid.system">
+```
+2. 添加apk安装完成广播
+```xml
+<application>
+    <receiver android:name=".PackageReceiver"
+        android:enabled="true"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        </intent-filter>
+    </receiver>
+</application>
+```
+
+# 签名说明
+
 ## 官网文档
 
 wiki.friendlyarm.com/wiki/index.php/NanoPC-T4/zh
