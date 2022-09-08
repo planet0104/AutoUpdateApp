@@ -31,11 +31,17 @@ public class PackageReceiver extends BroadcastReceiver {
 
 ## 修改 app/src/main/AndroidManifest.xml
 
-1. 添加Sytem UID权限
+1. 添加安装包权限
+```xml
+<uses-permission android:name="android.permission.INSTALL_PACKAGES" />
+```
+
+2. 【经过Android8.0系统测试，不添加 system uid仍然可以升级成功！】 添加Sytem UID权限
 ```xml
 <manifest android:sharedUserId="android.uid.system">
 ```
-2. 添加apk安装完成广播
+
+3. 添加apk安装完成广播
 ```xml
 <application>
     <receiver android:name=".PackageReceiver"
