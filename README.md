@@ -78,6 +78,24 @@ http://androidxref.com/8.1.0_r33/xref/build/target/product/security/
 
 在这里找到lib64：http://androidxref.com/8.1.0_r33/xref/prebuilts/sdk/tools/linux/lib64/
 
+## Android系统签名转换成keyStore文件，这样搞可以使用AndroidStudio自动签名了
+
+https://blog.csdn.net/wang_qian_kun/article/details/117994589
+
+RK3399 Android 10 源码：https://gitlab.com/friendlyelec/rk3399-android-10
+
+```shell
+# 在linux控制台 中输入指令将platform.pk8生成key.pem
+openssl pkcs8 -inform DER -nocrypt -in platform.pk8 -out key.pem
+# 在linux控制台 platform.x509.pem生成platform.p12。 platform.p12 密码是 password。alias别名是abcd，密码是1234567
+openssl pkcs12 -export -in platform.x509.pem -inkey key.pem -out platform.p12 -password pass:1234567 -name abcd
+# 在windows控制台 通过指令生成keystore：
+keytool -importkeystore -deststorepass 1234567 -destkeystore rk3399_android10.keystore -srckeystore platform.p12 -srcstoretype  PKCS12 -srcstorepass 1234567
+
+# Warning:
+# JKS 密钥库使用专用格式。建议使用 "keytool -importkeystore -srckeystore rk3399_android10.keystore -destkeystore rk3399_android10.keystore -deststoretype pkcs12" 迁移到行业标准格式 PKCS12。
+```
+
 ## 打包好的apk进行系统签名
 
 在windows系统中，需要安装安装wsl才能进行编译
